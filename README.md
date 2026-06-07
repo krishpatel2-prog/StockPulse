@@ -5,6 +5,14 @@ StockPulse is an enterprise-grade financial intelligence and predictive market m
 
 By processing asynchronous quantitative pipelines and text streams in parallel, StockPulse normalizes cross-platform dataset variables into singular, actionable market signals (`STRONG BUY`, `BUY`, `HOLD`, `SELL`, `STRONG SELL`) backed by statistical confidence scores.
 
+
+
+
+https://github.com/user-attachments/assets/1f9954ac-c690-44e1-95b5-a5bece1d054a
+
+
+
+
 ---
 
 ## 🛠️ System Architecture & Data Flow
