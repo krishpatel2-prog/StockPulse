@@ -1,4 +1,4 @@
-"""
+﻿"""
 app.py  –  StockPulse · Enhanced Streamlit Dashboard v3
 Premium dark-theme AI Sentiment × Price Intelligence UI
 """
@@ -578,12 +578,15 @@ hr {
 ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
 
 [data-testid="stSidebarNav"] { display: none; }
-.block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
+.block-container { padding-top: 4.5rem !important; padding-bottom: 2rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 API_BASE = "http://localhost:8000"
+
+if "analysis_config" not in st.session_state:
+    st.session_state["analysis_config"] = None
 
 POPULAR_TICKERS = {
     "AAPL" : "Apple Inc.",
@@ -632,7 +635,7 @@ INTERVAL_MAP = {"1d": "Daily", "1h": "Hourly"}
 
 
 # ── API helpers ────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def get_sentiment(ticker: str) -> dict:
     try:
         r = requests.get(
@@ -750,8 +753,8 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    ticker  = selected_option.split(" – ")[0].strip()
-    company = selected_option.split(" – ")[1].strip() if " – " in selected_option else ""
+    selected_ticker = selected_option.split(" – ")[0].strip()
+    selected_company = selected_option.split(" – ")[1].strip() if " – " in selected_option else ""
 
     st.markdown("<div class='sb-label' style='margin-top:20px;'>Chart Settings</div>",
                 unsafe_allow_html=True)
@@ -773,7 +776,30 @@ with st.sidebar:
     show_vol   = st.checkbox("Volume",          value=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("⟳  Refresh Data", use_container_width=True):
+    run_analysis = st.button("Analyze Stock", use_container_width=True)
+    refresh_data = st.button("⟳  Refresh Data", use_container_width=True)
+
+    pending_config = {
+        "ticker": selected_ticker,
+        "company": selected_company,
+        "period_label": period_label,
+        "period_days": period_days,
+        "interval": interval,
+        "chart_type": chart_type,
+        "show_bb": show_bb,
+        "show_sma7": show_sma7,
+        "show_sma21": show_sma21,
+        "show_sma50": show_sma50,
+        "show_vol": show_vol,
+    }
+
+    if run_analysis:
+        st.session_state["analysis_config"] = pending_config
+        st.cache_data.clear()
+        st.rerun()
+
+    if refresh_data and st.session_state.get("analysis_config"):
+        st.session_state["analysis_config"] = pending_config
         st.cache_data.clear()
         st.rerun()
 
@@ -790,6 +816,46 @@ with st.sidebar:
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+analysis_config = st.session_state.get("analysis_config")
+
+if not analysis_config:
+    st.markdown("""
+    <div style='max-width:760px;margin:80px auto 0;padding:28px 30px;
+                background:rgba(255,255,255,0.02);
+                border:1px solid rgba(255,255,255,0.06);
+                border-radius:18px;'>
+        <div style='font-family:Space Mono,monospace;font-size:0.72rem;
+                    color:#4a5568;text-transform:uppercase;letter-spacing:0.14em;'>
+            Ready When You Are
+        </div>
+        <div style='font-family:Syne,sans-serif;font-size:2.2rem;font-weight:800;
+                    color:#f0f6ff;line-height:1.1;margin-top:12px;'>
+            Configure the stock and analysis settings first
+        </div>
+        <div style='font-family:DM Sans,sans-serif;font-size:0.98rem;color:#7d8fa8;
+                    line-height:1.7;margin-top:14px;'>
+            Choose the ticker, timeframe, chart mode, and overlays in the sidebar.
+            Then click <strong style='color:#f0f6ff;'>Analyze Stock</strong> to load the dashboard.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
+
+ticker = analysis_config["ticker"]
+company = analysis_config["company"]
+period_label = analysis_config["period_label"]
+period_days = analysis_config["period_days"]
+interval = analysis_config["interval"]
+# Visual controls should respond immediately without requiring another
+# "Analyze Stock" click. Data-selection controls still follow the last
+# committed analysis config until the user refreshes or re-runs.
+chart_type = pending_config["chart_type"]
+show_bb = pending_config["show_bb"]
+show_sma7 = pending_config["show_sma7"]
+show_sma21 = pending_config["show_sma21"]
+show_sma50 = pending_config["show_sma50"]
+show_vol = pending_config["show_vol"]
 
 
 # ── Page Header ───────────────────────────────────────────────────────────────
@@ -903,13 +969,14 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TABS:  Chart · Polymarket · AI Signal · News Sentiment
+# TABS:  Chart · Polymarket · News Analysis · Public Opinion · AI Signal
 # ════════════════════════════════════════════════════════════════════════════
-tab_chart, tab_poly, tab_signal, tab_news = st.tabs([
+tab_chart, tab_poly, tab_news, tab_public, tab_signal = st.tabs([
     "📈  Price Chart",
     "🎲  Polymarket",
+    "📰  News Analysis",
+    "👥  Public Opinion",
     "🤖  AI Signal",
-    "📰  News Sentiment",
 ])
 
 
@@ -1512,11 +1579,11 @@ with tab_signal:
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# TAB 4 — NEWS SENTIMENT
+# TAB 4 — NEWS ANALYSIS
 # ────────────────────────────────────────────────────────────────────────────
 with tab_news:
     st.markdown(
-        f"<div class='chart-title'>📰 AI News Sentiment — {ticker}</div>",
+        f"<div class='chart-title'>📰 Official News Analysis — {ticker}</div>",
         unsafe_allow_html=True,
     )
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1526,16 +1593,70 @@ with tab_news:
 
     if sentiment_data.get("error"):
         st.error(f"⚠️ Failed to load sentiment data: {sentiment_data['error']}")
-    elif not sentiment_data.get("articles"):
-        st.info(f"ℹ️ No recent news articles found for **{ticker}**.")
     else:
-        summary  = sentiment_data.get("summary", {})
-        articles = sentiment_data.get("articles", [])
+        official_analysis = sentiment_data.get("official_analysis", {})
+        public_opinion = sentiment_data.get("public_opinion", {})
+        official_summary = official_analysis.get("summary", {})
+        official_articles = official_analysis.get("articles", [])
+        top_discussions = public_opinion.get("top_discussions", [])
 
-        signal = summary.get("signal", "NEUTRAL")
-        score  = summary.get("score", 0.0)
-        conf   = summary.get("confidence", 0.0)
-        reason = summary.get("reason", "")
+        source_badges = {
+            "news": ("NEWS", "pill-info"),
+            "yahoo": ("YAHOO", "pill-info"),
+            "reddit": ("REDDIT", "pill-neu"),
+            "stocktwits": ("STOCKTWITS", "pill-pur"),
+        }
+
+        def render_source_feed(items: list[dict], empty_copy: str):
+            if not items:
+                st.info(empty_copy)
+                return
+
+            for item in items:
+                title = item.get("title", "Untitled")
+                sent = (item.get("sentiment") or "neutral").lower()
+                item_score = item.get("score", 0.0) or 0.0
+                source_key = (item.get("source") or "news").lower()
+                source_label, source_class = source_badges.get(
+                    source_key,
+                    (source_key.upper(), "pill-info"),
+                )
+                url = item.get("url", "")
+
+                if sent == "positive":
+                    pill_class, item_class, icon = "pill-pos", "positive", "↑"
+                elif sent == "negative":
+                    pill_class, item_class, icon = "pill-neg", "negative", "↓"
+                else:
+                    pill_class, item_class, icon = "pill-neu", "neutral", "→"
+
+                view_link = (
+                    f"<a href='{url}' target='_blank' style='font-family:Space Mono,monospace;"
+                    f"font-size:0.6rem;color:#4a5568;text-decoration:none;"
+                    f"white-space:nowrap;'>View Source &#8599;</a>"
+                    if url else ""
+                )
+
+                st.markdown(
+                    f"<div class='news-item {item_class}'>"
+                    f"<div style='display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;'>"
+                    f"<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;'>"
+                    f"<span class='pill {pill_class}'>{icon} {sent.upper()} {item_score:+.2f}</span>"
+                    f"<span class='pill {source_class}'>{source_label}</span>"
+                    f"</div>"
+                    f"{view_link}"
+                    f"</div>"
+                    f"<div class='news-headline'>{title}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("<div class='section-label'>📰 Official News Analysis</div>", unsafe_allow_html=True)
+
+        signal = official_summary.get("signal", "NEUTRAL")
+        score  = official_summary.get("score", 0.0)
+        conf   = official_summary.get("confidence", 0.0)
+        reason = official_summary.get("reason", "")
 
         if "BUY" in signal:
             sig_class = "bullish"
@@ -1546,6 +1667,7 @@ with tab_news:
         else:
             sig_class = "neutral"
             sig_color = "#f59e0b"
+        signal_font_size = "1.7rem" if len(signal) >= 8 else "2.2rem"
 
         col_sent_score, col_sent_news = st.columns([1, 2.5])
 
@@ -1553,8 +1675,8 @@ with tab_news:
             conf_pct = int(conf * 100)
             st.markdown(
                 f"<div class='score-card {sig_class}'>"
-                f"<div class='score-label'>AI Market Signal</div>"
-                f"<div class='score-value' style='color:{sig_color};font-size:2.2rem;'>"
+                f"<div class='score-label'>Official Yahoo Signal</div>"
+                f"<div class='score-value' style='color:{sig_color};font-size:{signal_font_size};line-height:1.05;'>"
                 f"{signal}</div>"
                 f"<div class='score-tag' style='color:{sig_color};'>Score: {score:+.2f}</div>"
                 f"<div style='margin:18px 0 6px;'>"
@@ -1575,11 +1697,11 @@ with tab_news:
             )
 
             # ── Sentiment distribution mini chart ──────────────────────
-            pos = sum(1 for a in articles if a.get("sentiment") == "positive")
-            neg = sum(1 for a in articles if a.get("sentiment") == "negative")
-            neu = sum(1 for a in articles if a.get("sentiment") == "neutral")
+            pos = sum(1 for a in official_articles if a.get("sentiment") == "positive")
+            neg = sum(1 for a in official_articles if a.get("sentiment") == "negative")
+            neu = sum(1 for a in official_articles if a.get("sentiment") == "neutral")
 
-            if articles:
+            if official_articles:
                 fig_dist = go.Figure(go.Pie(
                     labels    = ["Positive", "Negative", "Neutral"],
                     values    = [pos, neg, neu],
@@ -1605,7 +1727,7 @@ with tab_news:
                         y=-0.1,
                     ),
                     annotations=[dict(
-                        text     = f"{len(articles)}<br><span style='font-size:8px'>articles</span>",
+                        text     = f"{len(official_articles)}<br><span style='font-size:8px'>articles</span>",
                         x=0.5, y=0.5,
                         font     = dict(color="#7d8fa8", size=11,
                                         family="Space Mono, monospace"),
@@ -1616,14 +1738,19 @@ with tab_news:
 
         with col_sent_news:
             st.markdown(
-                "<div class='section-label'>Analyzed Headlines</div>",
+                "<div class='section-label'>Yahoo Finance Articles</div>",
                 unsafe_allow_html=True,
             )
-
-            for art in articles:
+            for art in official_articles:
                 title     = art.get("title", "Untitled")
                 sent      = (art.get("sentiment") or "neutral").lower()
                 art_score = art.get("score", 0.0) or 0.0
+                source_key = (art.get("source") or "news").lower()
+                source_label, source_class = source_badges.get(
+                    source_key,
+                    (source_key.upper(), "pill-info"),
+                )
+                url = art.get("url", "")
 
                 if sent == "positive":
                     pill_class, item_class, icon = "pill-pos", "positive", "↑"
@@ -1632,13 +1759,146 @@ with tab_news:
                 else:
                     pill_class, item_class, icon = "pill-neu", "neutral",  "→"
 
+                view_link = (
+                    f"<a href='{url}' target='_blank' style='font-family:Space Mono,monospace;"
+                    f"font-size:0.6rem;color:#4a5568;text-decoration:none;"
+                    f"white-space:nowrap;'>View Source &#8599;</a>"
+                    if url else ""
+                )
+
                 st.markdown(
                     f"<div class='news-item {item_class}'>"
-                    f"<div style='display:flex;align-items:center;gap:8px;'>"
+                    f"<div style='display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;'>"
+                    f"<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;'>"
                     f"<span class='pill {pill_class}'>"
                     f"{icon} {sent.upper()} {art_score:+.2f}</span>"
+                    f"<span class='pill {source_class}'>{source_label}</span>"
+                    f"</div>"
+                    f"{view_link}"
                     f"</div>"
                     f"<div class='news-headline'>{title}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# TAB 5 — PUBLIC OPINION
+# ────────────────────────────────────────────────────────────────────────────
+with tab_public:
+    st.markdown(
+        f"<div class='chart-title'>👥 Public Opinion — {ticker}</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    with st.spinner(f"Loading public opinion for {ticker}…"):
+        sentiment_data = get_sentiment(ticker)
+
+    if sentiment_data.get("error"):
+        st.error(f"⚠️ Failed to load public opinion: {sentiment_data['error']}")
+    else:
+        public_opinion = sentiment_data.get("public_opinion", {})
+        top_discussions = public_opinion.get("top_discussions", [])
+
+        source_badges = {
+            "reddit": ("REDDIT", "pill-neu"),
+            "stocktwits": ("STOCKTWITS", "pill-pur"),
+        }
+
+        def render_public_feed(items: list[dict], empty_copy: str):
+            if not items:
+                st.info(empty_copy)
+                return
+
+            for item in items:
+                title = item.get("title", "Untitled")
+                sent = (item.get("sentiment") or "neutral").lower()
+                item_score = item.get("score", 0.0) or 0.0
+                source_key = (item.get("source") or "public").lower()
+                source_label, source_class = source_badges.get(
+                    source_key,
+                    (source_key.upper(), "pill-info"),
+                )
+                url = item.get("url", "")
+
+                if sent == "positive":
+                    pill_class, item_class, icon = "pill-pos", "positive", "↑"
+                elif sent == "negative":
+                    pill_class, item_class, icon = "pill-neg", "negative", "↓"
+                else:
+                    pill_class, item_class, icon = "pill-neu", "neutral", "→"
+
+                view_link = (
+                    f"<a href='{url}' target='_blank' style='font-family:Space Mono,monospace;"
+                    f"font-size:0.6rem;color:#4a5568;text-decoration:none;"
+                    f"white-space:nowrap;'>View Source &#8599;</a>"
+                    if url else ""
+                )
+
+                st.markdown(
+                    f"<div class='news-item {item_class}'>"
+                    f"<div style='display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;'>"
+                    f"<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;'>"
+                    f"<span class='pill {pill_class}'>{icon} {sent.upper()} {item_score:+.2f}</span>"
+                    f"<span class='pill {source_class}'>{source_label}</span>"
+                    f"</div>"
+                    f"{view_link}"
+                    f"</div>"
+                    f"<div class='news-headline'>{title}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+        public_score = public_opinion.get("public_sentiment_score", 0.0)
+        public_signal = public_opinion.get("public_signal", "NEUTRAL")
+        public_conf = public_opinion.get("confidence", 0.0)
+        public_volume = public_opinion.get("volume", 0)
+
+        if public_signal == "BULLISH":
+            public_class = "bullish"
+            public_color = "#22c55e"
+        elif public_signal == "BEARISH":
+            public_class = "bearish"
+            public_color = "#ef4444"
+        else:
+            public_class = "neutral"
+            public_color = "#f59e0b"
+        public_signal_font_size = "1.7rem" if len(public_signal) >= 8 else "2.2rem"
+
+        col_pub_score, col_pub_feed = st.columns([1, 2.5])
+
+        with col_pub_score:
+            public_conf_pct = int(public_conf * 100)
+            st.markdown(
+                f"<div class='score-card {public_class}'>"
+                f"<div class='score-label'>Retail/Public Mood</div>"
+                f"<div class='score-value' style='color:{public_color};font-size:{public_signal_font_size};line-height:1.05;'>{public_signal}</div>"
+                f"<div class='score-tag' style='color:{public_color};'>Score: {public_score:+.2f}</div>"
+                f"<div style='margin:18px 0 6px;'>"
+                f"<div style='display:flex;justify-content:space-between;"
+                f"font-family:Space Mono,monospace;font-size:0.6rem;color:#4a5568;"
+                f"margin-bottom:6px;'>"
+                f"<span>CONFIDENCE</span><span>{public_conf_pct}%</span>"
+                f"</div>"
+                f"<div style='background:rgba(255,255,255,0.04);border-radius:4px;height:4px;'>"
+                f"<div style='width:{public_conf_pct}%;height:100%;border-radius:4px;"
+                f"background:{public_color};box-shadow:0 0 8px {public_color};'></div>"
+                f"</div>"
+                f"</div>"
+                f"<div class='score-meta'>Retail posts analyzed: {public_volume}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        with col_pub_feed:
+            st.markdown(
+                "<div class='section-label'>Reddit Discussions & StockTwits Posts</div>",
+                unsafe_allow_html=True,
+            )
+            render_public_feed(
+                top_discussions,
+                f"ℹ️ No recent Reddit or StockTwits discussions found for **{ticker}**.",
+            )
+
+

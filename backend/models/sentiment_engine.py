@@ -96,6 +96,10 @@ def analyze_sentiment(news_list):
 
         results.append({
             "title": text,
+            "source": news.get("source", "news"),
+            "url": news.get("url") or news.get("link", ""),
+            "created_at": news.get("created_at") or news.get("published", ""),
+            "engagement": news.get("engagement"),
             "sentiment": final_label,
             "score":round(final_score,2)
         })

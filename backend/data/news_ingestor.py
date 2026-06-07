@@ -1,4 +1,3 @@
-import feedparser
 import json
 import re
 from urllib.parse import urlencode
@@ -167,6 +166,8 @@ def fetch_news(ticker: str, limit: int = 10):
     """
     Fetch and filter latest news headlines for a given stock ticker.
     """
+    import feedparser
+
     stock = resolve_stock(ticker)
     ticker = stock["symbol"]
 
@@ -184,6 +185,8 @@ def fetch_news(ticker: str, limit: int = 10):
     for entry in feed.entries[:limit * 2]:
         raw_news.append({
             "title": entry.title,
+            "source": "yahoo",
+            "url": getattr(entry, "link", ""),
             "link": getattr(entry, "link", ""),
             "published": getattr(entry, "published", "N/A")
         })
